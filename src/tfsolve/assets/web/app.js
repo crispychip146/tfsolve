@@ -591,9 +591,9 @@ document.addEventListener("DOMContentLoaded", function () {
     typing = setTimeout(refresh, 200);
   });
   text.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { clearTimeout(typing); refresh(); if (!showBtn.disabled) show(1); }
+    if (e.key === "Enter") { clearTimeout(typing); refresh(); if (!showBtn.disabled) { closeFilters(); show(1); } }
   });
-  showBtn.addEventListener("click", function () { show(1); });
+  showBtn.addEventListener("click", function () { closeFilters(); show(1); });
   $("results-update").addEventListener("click", function () { show(1); });
 
   $("overview-body").addEventListener("click", function (e) {
@@ -647,23 +647,28 @@ document.addEventListener("DOMContentLoaded", function () {
     if (d.open && d.classList && d.classList.contains("solution")) renderMath(d);
   }, true);
 
-  // Hide / show the filter sidebar; the choice is remembered in this browser.
-  var layout = document.querySelector(".layout");
-  var collapse = $("f-collapse");
-  function setFilters(hidden) {
-    layout.classList.toggle("filters-hidden", hidden);
-    collapse.setAttribute("aria-expanded", hidden ? "false" : "true");
-    collapse.querySelector(".arrow").textContent = hidden ? "»" : "«";
-    collapse.title = hidden ? "Show the filters" : "Hide the filters to give the questions the full width";
-    collapse.querySelector(".txt").textContent = "Hide filters";
-    if (hidden) collapse.setAttribute("aria-label", "Show filters"); else collapse.removeAttribute("aria-label");
+  // A modal sidebar keeps questions full width. The dialog handles focus and Escape.
+  var filters = $("filters");
+  var filtersToggle = $("f-toggle");
+  function syncFilters() {
+    filtersToggle.setAttribute("aria-expanded", filters.open ? "true" : "false");
+    document.body.classList.toggle("filters-open", filters.open);
   }
-  collapse.addEventListener("click", function () {
-    var hidden = !layout.classList.contains("filters-hidden");
-    setFilters(hidden);
-    try { localStorage.setItem("tfsolve-filters-hidden", hidden ? "1" : "0"); } catch (e) {}
+  function closeFilters() {
+    filters.close();
+    syncFilters();
+  }
+  filtersToggle.addEventListener("click", function () {
+    filters.showModal();
+    syncFilters();
   });
-  try { setFilters(localStorage.getItem("tfsolve-filters-hidden") === "1"); } catch (e) {}
+  $("f-close").addEventListener("click", closeFilters);
+  filters.addEventListener("close", syncFilters); // Escape also closes the native dialog.
+  filters.addEventListener("click", function (e) {
+    if (e.target !== filters) return;
+    var bounds = filters.getBoundingClientRect();
+    if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) closeFilters();
+  });
 
   // ---- printing
   // "Print / Save PDF" prints every question matching the filters (not just this page): they are fetched into a
@@ -712,6 +717,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.documentElement.classList.add("printing-all");
       document.documentElement.classList.toggle("print-questions-only", qonly.checked);
       countEvent("print-pdf", "Print / Save PDF");
+      closeFilters();
       window.print();
     }).catch(function () {
       clearPrint();

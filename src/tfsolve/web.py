@@ -187,7 +187,7 @@ def _help():
 <div class="about">
 <h2>On a course page</h2>
 <ol>
-  <li><b>Arrange</b> (top of the left panel):
+  <li>Press <b>Filters</b> to open the sidebar, then choose how to <b>Arrange</b> the questions:
     <ul>
       <li><b>By topic</b>: every topic in turn, all its past questions together.</li>
       <li><b>By year</b>: exam by exam, newest first.</li>
@@ -433,12 +433,19 @@ def _course(bank, course, repo_root, out_dir):
     }
     index_json = json.dumps(index, separators=(",", ":")).replace("</", "<\\/")
 
-    body = f"""<h1>{esc(course.display_code)}: {esc(course.title)}</h1>
+    body = f"""<div class="course-heading">
+  <h1>{esc(course.display_code)}: {esc(course.title)}</h1>
+  <button type="button" id="f-toggle" class="filters-toggle" aria-expanded="false" aria-controls="filters">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+      <path d="M4 6h16M4 12h16M4 18h16M9 3v6M15 9v6M9 15v6"/>
+    </svg>Filters</button>
+</div>
 <noscript><p class="empty">This page needs JavaScript to show the questions.</p></noscript>
-<div class="layout">
-<aside class="filters" id="filters">
-  <button type="button" id="f-collapse" class="collapse" aria-expanded="true" aria-controls="filters"
-    title="Hide the filters to give the questions the full width"><span class="arrow" aria-hidden="true">«</span><span class="txt">Hide filters</span></button>
+<dialog class="filters" id="filters" aria-labelledby="filters-title">
+  <div class="filters-heading">
+    <h2 id="filters-title">Filters</h2>
+    <button type="button" id="f-close" class="ghost" aria-label="Close filters" autofocus>×</button>
+  </div>
   <div class="panel">
   <div class="arrange" role="group" aria-label="Arrange questions">
     <span class="arrange-label">Arrange questions</span>
@@ -465,7 +472,8 @@ def _course(bank, course, repo_root, out_dir):
   <p class="count" id="f-count"></p>
   <p class="muted"><a href="../help.html">How to use this page</a></p>
   </div>
-</aside>
+</dialog>
+<div class="layout">
 <div class="questions">
 <details class="overview" id="overview" open>
   <summary id="overview-title">Jump to a topic</summary>
