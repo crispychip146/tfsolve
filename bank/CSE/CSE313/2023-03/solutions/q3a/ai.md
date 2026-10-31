@@ -7,19 +7,21 @@ created: 2026-10-06
 status: unverified
 summary: "Use a counting semaphore posted once per printed hello; Thread 2 does two waits before clearing pending."
 sources: ["OSTEP ch. 31 (semaphores)"]
+changes:
+  - "2026-10-31: Replaced volatile shared flag with an atomic flag and explained the synchronization guarantee."
 ---
 Use a semaphore `s` initialised to $0$ that counts how many times "hello" has been printed:
 
 ```c
 sem_t s;            // sem_init(&s, 0, 0);
-volatile int pending;
+_Atomic int pending;  // include <stdatomic.h>; initialise before creating threads
 ```
 
 | Thread 1 | Thread 2 |
 |:--|:--|
-| `pending = 1;` | `sem_wait(&s);` |
-| `while (pending) {` | `sem_wait(&s);` |
-| `printf("hello\n");` | `pending = 0;` |
+| `atomic_store(&pending, 1);` | `sem_wait(&s);` |
+| `while (atomic_load(&pending)) {` | `sem_wait(&s);` |
+| `printf("hello\n");` | `atomic_store(&pending, 0);` |
 | `sem_post(&s);` | |
 | `}` | |
 

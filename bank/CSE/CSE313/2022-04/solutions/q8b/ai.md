@@ -5,13 +5,15 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "DMA frees the CPU from copying (one interrupt per block) but is slower than the CPU and needs bus arbitration; device-independent I/O software gives uniform interfaces, buffering, error reporting, device allocation and a uniform block size."
+summary: "DMA reduces CPU copying; setup/pinning and memory-bus contention are costs. Device-independent I/O provides common interfaces, buffering and error handling."
 sources: ["Tanenbaum MOS 4e, sec. 5.1.4 (DMA) and sec. 5.3.2 (device-independent I/O software)"]
+changes:
+  - "2026-10-31: Removed false claim that DMA is generally slower and distinguished PIO from interrupt completion."
 ---
 **DMA.**
 
-- **Major advantage:** the CPU is not involved in the transfer. Without DMA the CPU is interrupted for every byte or word; with DMA it programs the controller (address, count, direction) and is interrupted **once per block**, so it can run other processes meanwhile.
-- **Major disadvantage:** the DMA controller is usually much **slower than the CPU**; if the CPU would otherwise have nothing to do while waiting, it is better to use programmed or interrupt-driven I/O. DMA also needs extra hardware and competes with the CPU for the memory bus (*cycle stealing*), and a controller that cannot drive the device at full speed gains little.
+- **Major advantage:** the CPU is not involved in the transfer. With programmed I/O, the CPU moves the data itself, using either polling or interrupt-driven service. With DMA it programs the controller (address, count, direction) and normally receives a completion interrupt per transfer, so it can run other processes meanwhile.
+- **Major disadvantage:** DMA needs setup, buffer mapping/pinning and synchronization, and competes with the CPU for memory/interconnect bandwidth (*cycle stealing*). For a tiny transfer, setup can cost more than a direct CPU copy. DMA is not inherently slower than the CPU: it is designed to sustain device transfers while freeing CPU time.
 
 **Functions of device-independent I/O software** (so that applications and drivers are written once, independent of the individual device):
 

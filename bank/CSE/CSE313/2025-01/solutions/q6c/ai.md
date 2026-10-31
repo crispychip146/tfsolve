@@ -3,9 +3,17 @@ author: ai
 via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
+changes:
+  - "2026-10-31: Separated valid mapping from physical residency and qualified clean-page eviction."
 ---
-- **Present/Valid bit**: tells the hardware (and OS) whether this PTE currently holds a valid virtual-to-physical translation, i.e., whether the page is actually resident in physical memory. If clear, any access causes a page fault, which traps into the OS to fetch the page (from disk/swap) or terminate the process on an illegal access.
+A page-table entry connects a virtual page to a physical frame and records whether an access is permitted. These three bits answer different questions:
 
-- **Dirty (modified) bit**: set automatically by hardware the first time the page is *written*. The OS uses it when evicting a page: a clean (not dirty) page can simply be dropped/overwritten because an identical copy already exists on disk; a dirty page must first be written back to disk, which is more expensive -- so the bit lets the replacement algorithm prefer evicting clean pages.
+| Bit | Meaning | OS use |
+|:--|:--|:--|
+| Present | The page currently resides in a physical frame | If absent, trap so the OS can bring it in or reject an invalid access |
+| Dirty/modified | The resident page has been written since the OS last marked it clean | Preserve changes before reusing the frame |
+| Reference/accessed | The page has been read or written since the OS last cleared the bit | Approximate recent use, as in Clock replacement |
 
-- **Reference (accessed) bit**: set automatically by hardware whenever the page is accessed (read *or* written). The OS periodically clears it and uses its value to approximate how recently/frequently a page has been used, which is the basis of approximate-LRU replacement policies such as the Clock (second-chance) algorithm.
+**Validity and presence are distinct concepts.** A valid virtual page can be temporarily absent because it was swapped out; an invalid address is outside the process's mappings. Some hardware encodes both through a non-present PTE and lets the OS distinguish them using additional mapping information.
+
+A dirty page normally needs write-back before eviction. A clean page can be discarded if a recoverable backing copy exists, or its contents can otherwise be reconstructed, for example a fresh zero-filled anonymous page. Clearing an accessed or dirty bit must follow the architecture's TLB rules so future accesses are observed correctly.

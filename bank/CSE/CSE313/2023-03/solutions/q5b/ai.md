@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "TLB = hardware cache of VPN-to-PFN translations (fully associative); on a context switch flush it or tag entries with an ASID."
 sources: ["OSTEP ch. 19 (TLBs, figs 19.1-19.2, context switches)"]
+changes:
+  - "2026-10-31: Clarified TLB membership and valid versus present PTE checks."
 ---
 **What it is.** The **translation-lookaside buffer** is a small, fast, hardware cache of recent virtual-to-physical translations that is part of the MMU. Without it every memory reference would first need an extra memory access to read the page-table entry (PTE).
 
@@ -33,6 +35,8 @@ else                                       // TLB miss
     PTE = AccessMemory(PTEAddr)
     if (PTE.Valid == False)
         RaiseException(SEGMENTATION_FAULT)
+    else if (PTE.Present == False)
+        RaiseException(PAGE_FAULT)       // valid mapping, currently nonresident
     else if (CanAccess(PTE.ProtectBits) == False)
         RaiseException(PROTECTION_FAULT)
     else
@@ -40,7 +44,7 @@ else                                       // TLB miss
         RetryInstruction()
 ```
 
-**Context switches.** The TLB contains translations for the *current* process only; the same VPN means different frames in different processes. Two solutions:
+**Context switches.** An untagged TLB must not reuse translations from another address space. With ASIDs it can contain translations for several processes; the same VPN can mean different frames in each. Two solutions:
 
 1. **Flush** the TLB on every context switch (set all valid bits to 0). Simple, but the new process starts with a cold TLB and suffers many misses.
 2. Add an **address-space identifier (ASID)** to each entry. The hardware compares the ASID with the current process's ASID (kept in a register), so entries of several processes can coexist and nothing needs to be flushed. Shared pages can even appear twice with different ASIDs, pointing to the same PFN.

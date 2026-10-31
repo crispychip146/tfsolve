@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "RPC lets f1 call f2 on another machine through stubs: marshal arguments, send, unmarshal and call, marshal result, return; stubs hide the network."
 sources: ["Tanenbaum MOS 4e, sec. 8.2.4 (remote procedure call)", "OSTEP ch. 48 (RPC)"]
+changes:
+  - "2026-10-31: Qualified retry semantics and duplicate suppression for non-idempotent RPCs."
 ---
 **RPC (remote procedure call)** lets a process call a procedure that executes on another machine *as if it were local*. The call and return are carried by messages, but the programmer only writes an ordinary procedure call; the hard work is hidden in generated **stubs** and the **RPC run-time library**.
 
@@ -23,4 +25,4 @@ For the call `p = f2(*a)` in `f1`, with `f2` running remotely:
 7. **Reply.** The server run-time sends the reply back.
 8. **Unmarshal at the client.** The client run-time wakes the client stub, which unmarshals the `float` and returns it to `f1` as the value of `f2(*a)`.
 
-**Details that must be handled:** parameter marshalling and data-representation differences; passing pointers and structures; binding/naming (finding the server); the transport protocol; **failures**: lost request or reply (timeouts, retransmission, duplicate detection), server crash, giving at-most-once or at-least-once semantics (a retry is safe only for idempotent procedures); and security/authentication.
+**Details that must be handled:** parameter marshalling and data-representation differences; passing pointers and structures; binding/naming (finding the server); the transport protocol; **failures**: lost request or reply (timeouts, retransmission, duplicate detection), server crash, giving at-most-once or at-least-once semantics (without duplicate suppression, re-executing a retried request is safe only if the procedure is idempotent. At-most-once systems use request IDs and duplicate-response tracking to avoid repeated execution; after some server failures the caller can still be uncertain whether the operation happened); and security/authentication.

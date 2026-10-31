@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "Use a two-level page table: only the second-level tables for used 4 MB regions are allocated, so a 12 MB process needs 16 KB instead of 4 MB."
 sources: ["Tanenbaum MOS 4e, sec. 3.3.2 (multilevel page tables)"]
+changes:
+  - "2026-10-31: Corrected worst-case multilevel-table coverage and explained sparse-region costs."
 ---
 **Problem.** 32-bit address space, 4 KB pages $\Rightarrow$ $2^{20}$ pages. With 4-byte entries a single-level table is $2^{20}\times4=4$ MB **per process**, permanently in memory, although a process uses only a small part of its address space.
 
@@ -22,6 +24,6 @@ sources: ["Tanenbaum MOS 4e, sec. 3.3.2 (multilevel page tables)"]
 $$\text{size}=\underbrace{4\text{ KB}}_{\text{top level}}+k\times4\text{ KB}\;\le\;4\text{ KB}+1024\times4\text{ KB}=4\text{ MB}+4\text{ KB}$$
 
 - **Typical process** (code, data/heap and stack in 3 regions, 12 MB in use): $4+3\times4=16$ KB, i.e. $256$ times smaller than the 4 MB of the single-level table.
-- **Worst case** (all 1024 regions used): only 4 KB more than the single-level table, which happens only for processes that use the whole 4 GB.
+- **Worst case** (all 1024 regions used): only 4 KB more than the single-level table, which happens whenever at least one page in each of the 1024 regions is mapped, even if most of the 4 GiB address space is unused.
 
-So the memory spent on page tables is proportional to the memory actually used, not to the size of the address space. (The price is one extra memory access per level on a TLB miss.)
+The saving depends on how many 4 MiB regions contain mappings, not only on the number of mapped pages. Dense clusters need few leaf tables; one page in each region needs every leaf table. (The price is one extra memory access per level on a TLB miss.)

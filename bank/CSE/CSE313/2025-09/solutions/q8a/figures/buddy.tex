@@ -1,0 +1,42 @@
+\documentclass[border=6pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta}
+\begin{document}
+\begin{tikzpicture}[>=Stealth]
+\node[align=center,font=\small] at (6.875,5.562) {Buddy allocation: each row spans 1024 KiB};
+\node[align=center,font=\small] at (1.000,4.588) {After A};
+\draw[fill=violet!12] (2.125,4.938) rectangle (4.909,4.237);
+\node[align=center,font=\small] at (3.517,4.588) {A: 200 / 256};
+\draw[fill=gray!10] (4.909,4.938) rectangle (7.693,4.237);
+\node[align=center,font=\small] at (6.301,4.588) {Free 256};
+\draw[fill=gray!10] (7.693,4.938) rectangle (13.261,4.237);
+\node[align=center,font=\small] at (10.477,4.588) {Free 512};
+\node[align=center,font=\small] at (1.000,3.400) {After B};
+\draw[fill=violet!12] (2.125,3.750) rectangle (4.909,3.050);
+\node[align=center,font=\small] at (3.517,3.400) {A};
+\draw[fill=violet!12] (4.909,3.750) rectangle (6.301,3.050);
+\node[align=center,font=\small] at (5.605,3.400) {B};
+\draw[fill=gray!10] (6.301,3.750) rectangle (7.693,3.050);
+\node[align=center,font=\small] at (6.997,3.400) {Free};
+\draw[fill=gray!10] (7.693,3.750) rectangle (13.261,3.050);
+\node[align=center,font=\small] at (10.477,3.400) {Free 512};
+\node[align=center,font=\small] at (1.000,2.212) {After C};
+\draw[fill=violet!12] (2.125,2.562) rectangle (4.909,1.863);
+\node[align=center,font=\small] at (3.517,2.212) {A};
+\draw[fill=violet!12] (4.909,2.562) rectangle (6.301,1.863);
+\node[align=center,font=\small] at (5.605,2.212) {B};
+\draw[fill=gray!10] (6.301,2.562) rectangle (7.693,1.863);
+\node[align=center,font=\small] at (6.997,2.212) {Free};
+\draw[fill=violet!12] (7.693,2.562) rectangle (13.261,1.863);
+\node[align=center,font=\small] at (10.477,2.212) {C: 300 / 512};
+\node[align=center,font=\small] at (1.000,1.025) {Free A};
+\draw[fill=gray!10] (2.125,1.375) rectangle (4.909,0.675);
+\node[align=center,font=\small] at (3.517,1.025) {Free 256};
+\draw[fill=violet!12] (4.909,1.375) rectangle (6.301,0.675);
+\node[align=center,font=\small] at (5.605,1.025) {B};
+\draw[fill=gray!10] (6.301,1.375) rectangle (7.693,0.675);
+\node[align=center,font=\small] at (6.997,1.025) {Free};
+\draw[fill=violet!12] (7.693,1.375) rectangle (13.261,0.675);
+\node[align=center,font=\small] at (10.477,1.025) {C};
+\end{tikzpicture}
+\end{document}

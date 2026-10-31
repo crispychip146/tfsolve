@@ -3,21 +3,24 @@ author: ai
 via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
+changes:
+  - "2026-10-31: Protected dirty-page write-back against concurrent writes and avoided spinning when all candidates are pending."
+summary: "Clock prefers unreferenced clean frames, writes dirty pages back asynchronously, preserves redirty state and waits when all candidates need I/O."
 ---
-**(i) Extra PTE bits needed:** the standard *use/reference bit (R)* (already assumed present for Clock) plus the *dirty/modified bit (M)*. We also conceptually need a (software) "write-back in progress" flag per frame so the algorithm does not try to evict/re-issue a flush for a page whose write-back is already underway.
+Ordinary Clock approximates recent use: the MMU sets a page's **reference bit R** on access, and the replacement hand clears it to give the page a second chance. A **dirty page** has changed since its backing copy was saved, so reusing its frame immediately would lose data.
 
-**(ii) Hardware support required:** the MMU must automatically *set* $R=1$ on any access (read or write) and *set* $M=1$ on any write, without trapping to software (this is standard on most architectures). The OS must be able to read and clear $R$ cheaply (e.g., by manipulating the PTE's permission bits or a dedicated flag) during the periodic clock sweep, and must be able to issue an asynchronous write-back of a page to disk while the process continues running.
+**(i) Bookkeeping.** Keep R and the **dirty/modified bit M** in the PTE or equivalent per-page state. Also keep software flags for write-back in progress and whether the page was written again during that write-back. The latter flags normally belong to the kernel's page/frame descriptor; they need not consume hardware PTE bits.
 
-**(iii) Modified Clock algorithm (handles dirty pages):**
+**(ii) Hardware and OS support.** The MMU should record references and writes, or the OS must emulate them with protection faults. The OS must clear/sample those bits using the architecture's TLB synchronization rules. The storage subsystem needs asynchronous write-back; page locking, write protection, or a stable I/O snapshot must make the bytes being written consistent.
 
-1.  Clock hand scans frames circularly, as usual.
+**(iii) Replacement steps.**
 
-2.  At the candidate frame: if $R=0$ and $M=0$ $\to$ this page is both unused and clean $\to$ **evict it immediately** (free, no I/O needed).
+1. Scan eligible resident frames in a circular order. Skip pinned or otherwise unevictable frames.
+2. If R is 1, clear R and advance: the page gets another chance.
+3. If R is 0 and the page is clean with no write-back pending, invalidate its mappings/TLB entries safely and reuse the frame.
+4. If R is 0 and the page is dirty, start write-back if none is pending, then continue scanning. Do not overwrite its frame while I/O still reads it.
+5. After a full scan with no usable victim, wait for write-back or another reclaim event, rather than spinning indefinitely.
 
-3.  If $R=0$ and $M=1$ $\to$ unused but dirty: **do not evict yet**; instead *start an asynchronous write-back* of the page to disk (mark it "write pending"), and move the hand on. When the write-back later completes, clear $M$ -- the page is now a cheap (clean) eviction candidate the next time the hand reaches it.
+**The concurrent-write case matters.** Suppose the OS starts saving version A, the process then writes version B, and the I/O of A completes. Simply clearing M at completion would falsely label B clean. A correct implementation clears/records the dirty state when taking the stable write-back version, records later writes separately, and marks the page clean on completion **only if it has not been dirtied again**. Otherwise another write-back is required. Recheck R and mapping state before eviction too.
 
-4.  If $R=1$ $\to$ give the page a second chance: clear $R$ to 0 (regardless of $M$) and move the hand on without evicting.
-
-5.  Repeat until a frame with $R=0,\,M=0$ is found (either originally clean, or a dirty page whose background flush has since completed); evict that frame for the incoming page.
-
-*Rationale*: by always preferring clean victims and proactively flushing dirty pages *before* they are actually needed, the algorithm converts what would be a synchronous, expensive dirty-page write-back at fault time into a cheap, already-clean eviction, hiding disk latency behind ongoing execution.
+The policy prefers unreferenced clean victims and starts expensive writes early so that I/O can overlap other execution. It improves the timing of write-back; it does not remove the need to preserve every dirty version still required by a live mapping.

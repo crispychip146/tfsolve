@@ -7,7 +7,11 @@ created: 2026-10-06
 status: unverified
 summary: "Mirroring the parity disk lifts RAID-4 random-write throughput from R/2 to 2R/3 (still a bottleneck); random read and sequential read/write do not change."
 sources: ["OSTEP ch. 38 (RAID-4, small-write problem)"]
+changes:
+  - "2026-10-31: Clarified disk-count convention and the limited reliability benefit of mirrored parity."
 ---
+Let N be the **original** RAID-4 disk count: N-1 data disks and one parity disk. Mirroring parity adds a disk, so the modified array has N+1 disks but still N-1 data disks.
+
 **Plain RAID-4 random write.** Each small write needs the *subtractive parity* method: read the old data and the old parity, then write the new data and the new parity (4 I/Os). The two parity I/Os land on the **single parity disk**, every time, so the parity disk serialises all the writes: each user write costs it one read and one write, i.e. 2 I/Os, so
 
 $$\text{random write} \approx \frac{R}{2}\quad(\text{independent of the number of disks }N).$$
@@ -27,4 +31,4 @@ A modest improvement (a factor $4/3$), but it is still limited by the parity pai
 - **Sequential read:** unchanged, $(N-1)\cdot S$ (parity not read).
 - **Sequential write:** unchanged, $(N-1)\cdot S$: full-stripe writes compute the parity once and write it to both mirrors in parallel, taking the same time as before.
 
-The mirror also improves *reliability* (the parity disk is no longer a single point of failure) at the cost of one more disk.
+The extra parity copy tolerates some additional failure combinations, but plain RAID-4 already survives a single parity-disk failure. Two failed data disks still cannot be reconstructed from duplicate copies of the same XOR equation; this is not RAID-6.

@@ -5,8 +5,10 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "Data journaling writes TxB, bitmap, inode, 3 data blocks, then TxE, then checkpoints; metadata journaling writes data first and journals only bitmap+inode; the checksum version drops the wait before commit."
+summary: "Checksum batching retains TxE and removes only the internal journal wait; ordered metadata journaling must keep home data durable before commit."
 sources: ["OSTEP ch. 42 (crash consistency: journaling)"]
+changes:
+  - "2026-10-31: Kept TxE and durable data-before-commit ordering in checksum metadata journaling."
 ---
 Blocks to be updated: data blocks **8, 11, 12**; inode in block **3**; bitmap in block **2**. The journal occupies blocks **24-31**.
 
@@ -33,10 +35,10 @@ Timeline:
 
 The data is written first so that the inode never points to garbage after a crash.
 
-**iii. Metadata journaling with checksum optimisation.** TxB holds a checksum of the whole transaction, and there is no separate wait before TxE:
+**iii. Metadata journaling with checksum optimisation.** The checksum detects an incomplete journal body, so the body and **TxE** can be submitted together. It does not cover data written outside the journal:
 
-1. **Journal write and commit in one go:** write TxB (with checksum), bitmap, inode and the final data blocks D8, D11, D12 at the same time; wait for all.
-2. **Checkpoint:** write bitmap (2) and inode (3).
-3. **Free.**
+1. Write D8, D11 and D12 to their home locations and wait for durable completion.
+2. Submit TxB (24), bitmap (25), inode (26) and **TxE (27)** as one checksum-protected journal batch; wait for durable completion. No separate body-before-TxE wait is required.
+3. Checkpoint bitmap (2) and inode (3), wait for those writes to become durable, then free the journal space.
 
-On recovery the checksum of the journalled blocks is recomputed; if it does not match, the transaction is discarded. This removes one rotation/wait of the protocol.
+On recovery the checksum of the journalled blocks is recomputed; if it does not match, the transaction is discarded. This removes the separate wait within the journal. The data-before-commit dependency remains: otherwise valid-looking metadata could point to stale data. A cache acknowledgment alone does not establish durability; the storage interface must enforce the required flush/order guarantees.

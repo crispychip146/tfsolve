@@ -3,6 +3,9 @@ author: ai
 via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
+changes:
+  - "2026-10-31: Included unused root entries and distinguished packed table sizes from page-sized allocations."
+summary: "Single-level 4 MiB; packed three-level tables 6 KiB with 1936 B of unused entries; one frame per table instead consumes 84 KiB."
 ---
 32-bit VA, 4KB pages $\Rightarrow$ 20 bits of VPN, 12 bits offset. 3-level split: 8 / 6 / 6 bits (level-1 / level-2 / level-3), matching the 20-bit VPN ($8+6+6=20$). PTE/PDE size $=4$B.
 
@@ -10,7 +13,7 @@ imported_from: cse313_mem_fs_solved.tex
 
 **(ii) 3-level page table.** Only branches of the tree that are actually used get allocated.
 
-- *Level-1 table*: always fully allocated $-2^{8}=256$ entries $\times4$B$=1024$B $=1$KB.
+- *Level-1 table*: always fully allocated: $2^{8}=256$ entries $\times4$B$=1024$B $=1$KB.
 
 - Code (VPN 0--3) and Heap (VPN 1024--2047) both fall under level-1 index $0$ (since $2047\gg12=0$). Stack (VPN $2^{20}-4 .. 2^{20}-1$) falls under level-1 index $255$ (the top index). So only **2 level-1 entries** are valid $\Rightarrow$ 2 level-2 tables, each $2^{6}\times4$B$=256$B $\Rightarrow 2\times256=512$B.
 
@@ -36,4 +39,8 @@ imported_from: cse313_mem_fs_solved.tex
 
 - Heap's 16 level-3 tables are exactly full (1024 pages / 64 per table) $\to$ no waste there.
 
-This is *internal fragmentation* of the fixed fan-out tree nodes ($\approx$ 920B total here, small, but it is a structural inefficiency, not a coincidence of this example). **Mitigation**: use a data structure whose size scales with the number of pages *actually* mapped rather than a fixed fan-out per level, e.g., an **inverted page table** (one entry per physical frame) or a **hashed page table**, at the cost of a more complex (hash-based) lookup instead of simple array indexing.
+- The root also has 254 unused entries: $254\times4=1016$B. Total unused-entry storage is therefore $480+188+252+1016=\mathbf{1936\text{ B}}$.
+
+The **6 KiB** result assumes the allocator packs each table at its actual size. If every table must occupy a separate 4 KiB physical frame, there are $1+2+18=21$ table frames, consuming **84 KiB**. The unused frame tails alone waste $84-6=78$ KiB, in addition to unused entries inside the table arrays. The question does not specify the allocation granularity, so these assumptions must be distinguished.
+
+This is internal allocation waste: space reserved inside table nodes or table frames. Noncontiguous physical frames can hold different table nodes, so no large contiguous physical region is required. A direct remedy is to pack 256B and 1024B tables into physical pages using a suitable sub-page allocator, if the hardware permits their alignment. Alternatively, a split such as 10/10/12 makes each table exactly one page, but changes this question's specified layout. Hashed or inverted tables are other designs, with different lookup costs; an inverted table scales with physical frames, rather than the process's virtual-page count.

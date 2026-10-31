@@ -5,13 +5,21 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "FAT: no real locality heuristic (first free block), so fragmentation; FFS: block groups keep inode, directory and data together, large-file exception, reserved free space; NTFS: best-fit allocation of extents, MFT/metadata placement, defragmentation."
+summary: "FAT cluster chains, FFS cylinder-group locality, NTFS runlists and resident attributes; exact allocation heuristics depend on implementation."
 sources: ["Anderson and Dahlin, OSPP, ch. 13 (locality heuristics of FAT, FFS and NTFS)"]
+changes:
+  - "2026-10-31: Replaced universal allocator claims with the actual locality mechanisms and their limits."
 ---
-| | **FAT** | **FFS** | **NTFS** |
-|:--|:--|:--|:--|
-| **Placement heuristic** | essentially **none**: a new block is the **first free block** found in the FAT (first fit), wherever it is | **block groups** (cylinder groups): the inode, the directory entries and the data of a file are placed in the **same group**; subdirectories are spread over groups | **best-fit** extent allocation: the allocator looks in the free-space bitmap for the smallest free run that fits the request; files grow by extents |
-| **Locality of related data** | poor: files become fragmented over time; the FAT is at one end of the disk, so each access needs a seek to the FAT | good: related blocks are close, so reads of a file or directory need little seeking; a **large file exception** puts big files in several groups so one file does not fill a group | good for sequential access: contiguous extents; the MFT is placed in the middle of the disk to reduce seeks; small files stored in the MFT record |
-| **Keeping free space usable** | needs a periodic **defragmentation** utility | **reserves 10% of the blocks** (the disk is considered full at 90%) so a free block near the file can be found | defragmenter, and best fit to limit external fragmentation; grows files in larger extents (pre-allocation) |
+All three systems must map logical file offsets to disk locations, but their metadata and placement mechanisms give different opportunities for locality.
 
-**Summary.** FAT has no real heuristic (locality only by luck), FFS places by **location (group)**, and NTFS by **extent size (best fit)** and metadata placement.
+| System | Mapping and locality | Main limitation |
+|:--|:--|:--|
+| FAT | A cluster chain, recorded in a central allocation table; choosing nearby free clusters can keep a growing file contiguous | Fragmented chains require traversal; unlike FFS, there is no inode/data cylinder-group policy |
+| FFS | Put a file's inode near its directory and its data near its inode, using cylinder groups; spread directories and large-file chunks to preserve free space | Locality is a heuristic, and a large file deliberately spans groups |
+| NTFS | Store small attribute values in the MFT record and larger file data in runs of contiguous clusters, described by runlists | Fragmentation creates more runs and retrieval metadata; MFT growth also needs reserved space |
+
+FAT is not inherently forbidden from allocating contiguous clusters: sequential or remembered-position allocation can create locality while free space permits it. Also, a cached FAT avoids a disk seek to the FAT for every chain step.
+
+FFS tracks free blocks/inodes per group and traditionally reserves some free space so nearby placement remains possible as the volume fills. The reservation percentage is a configuration/design choice, not a universal law.
+
+NTFS uses a free-cluster bitmap and run-based allocation, with space reserved for MFT growth. Descriptions such as "always best-fit" or "the MFT is always at the disk's middle" are not general guarantees. The comparison that matters is **cluster chains**, **group-based placement**, and **run-based allocation with resident metadata/data**.

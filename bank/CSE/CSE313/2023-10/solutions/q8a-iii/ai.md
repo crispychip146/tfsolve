@@ -4,11 +4,13 @@ via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
 changes:
+  - "2026-10-31: Removed unsupported claim that append-only segment writes automatically make unlink atomic."
   - "2026-09-30 (import): split from the combined (i)-(iii) solution."
 ---
-Because lfs only ever *appends* new log entries (it never overwrites live data in place), a crash mid-`rm` simply leaves the update incomplete in the log:
+Recovery begins with the latest complete checkpoint and scans later log records to reconstruct newer state. The important question is whether **all logically dependent parts of the delete** are recoverable: the parent directory update, the file's link-count update, and the relevant inode-map changes.
 
-- If the segment containing the new (updated) directory data was never fully written (the checksum in its segment summary fails to validate), recovery discards that partial segment entirely, and the file system reverts to its state *before* the `rm` began -- `lfsfile.txt` is still present, exactly as if the delete had never been attempted.
-- If the segment *was* fully written and validated before the crash (the crash happened only before the next checkpoint), **roll-forward** recovery (replaying validated post-checkpoint segments) ensures the delete is still correctly reflected.
+- If no complete deletion operation became durable, recovery retains the earlier consistent state. A torn or incomplete log tail must not be treated as a committed deletion.
+- If a complete deletion operation is durable beyond the checkpoint, roll-forward applies it, so the name remains removed.
+- If the crash leaves only part of the operation, the recovery protocol must reconcile those related updates, using operation records, transaction boundaries, or the filesystem's directory-recovery procedure. Merely appending blocks does not make a multi-block or multi-segment operation atomic.
 
-Either way, the file system ends up in a consistent state -- either fully deleted or not deleted at all, never half-deleted -- because of the atomic, append-only, checksum-validated nature of lfs's log.
+A segment checksum can help detect an incomplete write, but cannot by itself prove that every part of an `rm` operation was included. Assuming a correct atomic-update/recovery protocol, the recovered namespace reflects either the old state or the completed delete. Open descriptors and other hard links still determine when the underlying file can be reclaimed.

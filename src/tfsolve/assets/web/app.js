@@ -1,13 +1,6 @@
-// tfsolve website: theme, page counts, and the course page (filters, results with paging, printing).
+// tfsolve website: page counts, and the course page (filters, results with paging, printing).
 // A course page holds only an index; each question is fetched when shown. The address bar keeps the view
 // (#show=1&topic=deadlock&p=2) so it can be bookmarked or shared.
-
-// Light/dark: follows the device until the toggle is used; the choice is remembered per browser.
-function currentTheme() {
-  var set = document.documentElement.dataset.theme;
-  if (set) return set;
-  return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
 
 // Pandoc marks math as <span class="math inline|display">x^2</span>. Only the formulas that are on screen are
 // rendered (not those inside a closed solution), so a page of questions appears quickly even on a tablet.
@@ -22,15 +15,6 @@ function renderMath(root) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  var toggle = document.getElementById("theme-toggle");
-  if (toggle) {
-    toggle.addEventListener("click", function () {
-      var next = currentTheme() === "dark" ? "light" : "dark";
-      document.documentElement.dataset.theme = next;
-      try { localStorage.setItem("tfsolve-theme", next); } catch (e) {}
-    });
-  }
-
   // Anonymous counting with GoatCounter: page views and Print / Save PDF clicks, nothing else.
   // Nothing is sent, and no numbers are fetched, if the browser says Do Not Track / Global Privacy Control.
   var GC = "https://tfsolve.goatcounter.com";

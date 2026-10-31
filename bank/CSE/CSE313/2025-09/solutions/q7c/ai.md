@@ -2,23 +2,26 @@
 author: ai
 via: chat
 status: unverified
-summary: "(i) Correct for data journaling. For metadata journaling it is unsafe unless data is still written before the transaction: the checksum does not cover data blocks, so TxE could reach disk first and replay would point at garbage. (ii) Yes, one wait per transaction disappears; drawbacks are the checksum cost, extra recovery work and the ordering still needed for metadata journaling."
+summary: "Checksums can remove the body-before-commit wait under a complete recovery protocol; metadata journaling still needs durable home data before commit."
 imported_from: cse313_mem_fs_solved.tex
 changes:
+  - "2026-10-31: Qualified checksum correctness, retained data ordering, and removed an unsafe external-data-checksum workaround."
   - "2026-09-30 (import review): part (i) corrected. The earlier answer called the scheme sound for metadata journaling. There, data blocks go to their home locations outside the journal, so the checksum cannot enforce 'data before commit'."
 ---
-This is the "transactional checksum" idea used by Linux ext4 (and described in OSTEP's journaling chapter): write the whole transaction at once and let the checksum reveal, at recovery time, whether it all made it to disk.
+Bob is trying to eliminate a wait: normally the journal body must become durable before TxE is written. A checksum can let recovery detect an incomplete body even when TxE reaches storage first. This helps only if recovery can reliably associate the begin record, body and end record with the **same transaction**.
 
-**(i) Correctness.**
+**(i) Correctness conditions.**
 
-- **Data journaling: correct.** Everything that must be atomic (the new data *and* the metadata) is inside the transaction, so the checksum covers it all. If a crash leaves any journal block missing or torn, the recomputed checksum does not match the value in TxB/TxE and recovery discards the transaction; if it matches, replay is safe. This needs a checksum strong enough to catch torn writes (ext4 uses CRC32C; a plain 32-bit sum is weaker).
-- **Metadata (ordered) journaling: there is a problem.** User data is written straight to its home location and is **not** in the journal, so the checksum does not cover it. Ordered journaling is safe only because the data write *finishes before* the commit is written. If Bob issues every write at once, TxE can reach the disk before the data block. After a crash, the transaction's checksum still matches, recovery replays the metadata, and the file now points to a block that never received its new data: garbage, or another file's old contents.
-  - Fix: keep waiting for the data writes before writing the transaction. Only the wait *inside* the journal (between the body and TxE) goes away.
-  - Alternatively, put checksums of the data blocks into the transaction, so recovery can detect that they were never written.
+For **data journaling**, checking the logged data and metadata can detect a torn/incomplete journal transaction. However, the proposal is not an unconditional proof of atomicity:
 
-**(ii) Performance.** Yes, commits get faster. The classic protocol writes TxB and the body, *waits* for them to reach the disk, then writes TxE. With checksums, TxB, the body and TxE go in one batch, which saves at least one full disk round-trip (and a cache flush) per transaction. Hidden drawbacks:
+- A 32-bit checksum has collisions. Matching checksums are evidence of completeness, not a mathematical guarantee against every possible partial write or corruption.
+- TxB/TxE need validated transaction identifiers, lengths and replay destinations, particularly when journal space is reused. Bob excludes those headers from the checksum, so the checksum alone cannot authenticate or detect corruption of those fields.
+- The system may acknowledge a durable commit only once the required transaction is durably stored. Journal space cannot be reused until checkpoint writes are durable.
 
-- CPU time to compute the checksum on every commit, and to recompute it for every transaction during recovery.
-- The number of bytes written is the same, so the benefit is only the removed wait; it is small where flushes are already cheap.
-- For metadata journaling the data-before-commit ordering still has to be enforced (or covered by extra checksums), so the gain there is smaller.
-- A weak checksum can miss some torn writes, turning a rare crash into silent corruption.
+Under those additional protocol assumptions and the ordinary checksum error-detection model, the journal body and TxE can be issued together; recovery ignores transactions that fail validation.
+
+For **ordered metadata journaling**, regular-file data is outside the checksum-protected journal. Suppose metadata and TxE become durable while a newly allocated data block does not. The metadata checksum still matches, but replay exposes stale bytes. Therefore **make the associated home data durable before the metadata commit can become durable**. A simple correct schedule is: durable data writes; then one batch containing TxB, journal metadata and TxE; then durable metadata checkpointing. Only the wait *inside* the journal is removed.
+
+Adding checksums of external home data is not a simple substitute: if that data has overwritten an old live block and recovery rejects the metadata transaction, the old data may already be gone. A complete recovery design would be needed.
+
+**(ii) Performance and drawbacks.** Batching body and TxE can save a serial I/O completion/flush interval. It does not reduce the bytes written, and ordered mode must still respect data dependencies. Costs include checksum computation, recovery validation, collision risk, and more complex handling of journal reuse and corrupt records. The improvement is workload-dependent; it is not guaranteed to be exactly one full disk rotation.

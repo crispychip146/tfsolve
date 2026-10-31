@@ -7,8 +7,10 @@ created: 2026-10-06
 status: unverified
 summary: "(i) tick 10: pages 0 and 1 get R=0 and time stamp 10; (ii) fault on page 3: assuming the hand starts at page 0, pages 0 and 1 get R=0, page 2 (R=0, age 3 > 2, clean) is replaced by page 3 (time stamp 10, V=1, R=1, M=0)."
 sources: ["Tanenbaum MOS 4e, sec. 3.4.9 (WSClock)"]
+changes:
+  - "2026-10-31: Explained timestamp-sampling variants of WSClock instead of presenting one as universal."
 ---
-**WSClock rules.** $\tau=2$, current virtual time $=10$; age $=10-\text{time stamp}$. Pages are on a circular list. **Assumptions:** (a) a clock interrupt records the use of every page with $R=1$ (time stamp $\leftarrow 10$) and clears $R$; (b) on a page fault the hand starts at page 0; a page with $R=1$ is given a "second chance" ($R\leftarrow0$, hand moves on); a page with $R=0$ and age $>\tau$ is replaced if it is clean (a dirty one would first be scheduled for writing).
+**WSClock rules and conventions.** $\tau=2$, current virtual time $=10$; age $=10-\text{time stamp}$. Pages are on a circular list. **Assumptions:** (a) a clock interrupt records the use of every page with $R=1$ (time stamp $\leftarrow 10$) and clears $R$; (b) on a page fault the hand starts at page 0; a page with $R=1$ is given a "second chance" ($R\leftarrow0$, hand moves on); a page with $R=0$ and age $>\tau$ is replaced if it is clean (a dirty one would first be scheduled for writing).
 
 Initial table:
 
@@ -27,7 +29,7 @@ Initial table:
 | 0 | **10** | 1 | **0** | 0 |
 | 1 | **10** | 1 | **0** | 1 |
 
-**(ii) Page fault at tick 10 (read of page 3, which is not valid).**
+**(ii) Page fault at tick 10 (read of page 3, which is not resident).**
 
 - Hand at page 0: $R=1$ $\to$ set $R=0$, move on.
 - Page 1: $R=1$ $\to$ set $R=0$, move on.
@@ -42,4 +44,4 @@ The frame is given to page 3 and page 2 becomes invalid; the new page is read, s
 | 2 | 7 | **0** | 0 | 0 |
 | 3 | **10** | **1** | **1** | 0 |
 
-Page 4 is unchanged ($6,1,0,1$).
+Page 4 is unchanged ($6,1,0,1$). The table above uses the stated convention that timestamps are sampled at periodic clock interrupts. Another common WSClock implementation also refreshes the timestamp whenever the fault-time hand encounters $R=1$; under that convention pages 0 and 1 get timestamp **10**, rather than 9, in (ii). Both conventions evict page 2 here. No initial clock-hand position is provided, so the victim also depends on the stated starting-hand assumption; for example, starting at page 4 can initiate its dirty-page write-back before reaching a clean victim.

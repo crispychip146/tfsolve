@@ -7,13 +7,15 @@ created: 2026-10-06
 status: unverified
 summary: "Detection algorithm with matrices E, A, C, R; for the given state P2 and P3 can finish, P1 and P4 stay unmarked, so P1 and P4 are deadlocked."
 sources: ["Tanenbaum MOS 4e, sec. 6.4.2 (deadlock detection with multiple resources of each type)"]
+changes:
+  - "2026-10-31: Distinguished outstanding requests used in detection from maximum claims used in avoidance."
 ---
 **Matrices.** $n$ processes, $m$ resource classes.
 
 - $E=(E_1,\dots,E_m)$: **existing** resource vector (total number of instances of each class).
 - $A=(A_1,\dots,A_m)$: **available** resource vector (instances currently free).
 - $C$ ($n\times m$): **current allocation** matrix; $C_{ij}$ = instances of resource $j$ held by process $i$.
-- $R$ ($n\times m$): **request** matrix; $R_{ij}$ = instances of resource $j$ that process $i$ still wants.
+- $R$ ($n\times m$): **request** matrix; $R_{ij}$ = instances of resource $j$ that process $i$ is currently requesting, in addition to what it holds. This is not the maximum-claim matrix of Banker's avoidance algorithm.
 
 Invariant: $\sum_i C_{ij}+A_j=E_j$.
 

@@ -5,24 +5,42 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "Use a mutex (lock) per buffer/queue instead of raising the processor level: a process locks the hash queue, finds the buffer busy and waits on a condition variable that atomically releases the lock; on a multiprocessor this also works across CPUs."
+summary: "Use a coherent cache mutex with threaded completion handling, or an IRQ-safe spinlock; an ordinary hard-interrupt spinlock alone is unsafe."
 sources: ["Bach, ch. 3 (getblk, scenario 5); OSTEP ch. 28-30 (locks and condition variables)"]
+changes:
+  - "2026-10-31: Used one consistent cache lock and explained why an ordinary interrupt-context lock cannot replace interrupt masking."
 ---
-**Yes, it is possible.** Raising/lowering the processor execution level (blocking interrupts) is used because interrupt handlers (e.g. `brelse` called from the disk interrupt) and processes manipulate the same lists; it only works on a **uniprocessor**. Equivalent protection can be obtained with **locks**, provided that interrupt handlers use the same locks (spin locks that also block local interrupts on a multiprocessor, or sleeping locks if the handler runs as a thread).
+**A lock can protect the buffer-cache structures, but an ordinary spinlock alone cannot safely replace interrupt masking when a hard interrupt handler takes the same lock.** If the interrupt preempts its owner on one CPU, the handler spins forever and the owner cannot resume. A sleeping mutex cannot be taken by a hard interrupt handler either.
 
-**Applying a lock in scenario 5** (the block is in the cache, but its buffer is busy):
+There are two valid designs:
 
-```c
-lock(&hash_queue_lock[h]);                 /* protects the hash queue and the free list */
-while (1) {
-    buf = search(hash_queue[h], dev, blk);
-    if (buf != NULL && buf->busy) {
-        buf->wanted = 1;
-        cond_wait(&buf->free_cv, &hash_queue_lock[h]);   /* releases the lock, sleeps, re-takes it */
-        continue;                                         /* search again (the "while" of getblk) */
-    }
-    ...
-}
+- Use an **interrupt-safe spinlock**, masking the relevant local interrupts while it is held. This handles other CPUs too, but does not eliminate interrupt masking entirely.
+- If masking must be avoided, make the hard interrupt handler only record/queue completion using an interrupt-safe primitive. A **threaded handler** later performs cache-list updates under the same ordinary mutex as process code.
+
+For the second design, use one `cache_lock` for the illustrated hash queues, busy flags and free list. Separate hash locks do not by themselves protect a shared global free list.
+
+```text
+getblk_scenario_5(device, block):
+    lock(cache_lock)
+    while true:
+        buf = lookup(device, block)
+        if buf exists and buf.busy:
+            wait(buf.available, cache_lock)
+            continue
+        if buf exists:
+            buf.busy = true
+            remove_from_free_list(buf)
+            unlock(cache_lock)
+            return buf
+        // Continue the other getblk scenarios under the same locking discipline.
+
+brelse_from_process_or_threaded_handler(buf):
+    lock(cache_lock)
+    buf.busy = false
+    insert_into_free_list(buf)
+    broadcast(buf.available)
+    broadcast(any_buffer_available)
+    unlock(cache_lock)
 ```
 
-The `cond_wait` **atomically releases the lock and puts the process to sleep**, so no wakeup can be lost between the test and the sleep (the job the raised processor level did on a uniprocessor); `brelse` takes the same lock, sets `busy = 0` and does `cond_broadcast(&buf->free_cv)`. The process re-checks the condition after waking up.
+The wait atomically registers the sleeper and releases the mutex, so a release cannot slip between the busy check and sleep. On wakeup the process redoes the lookup: another process may have acquired or reassigned the buffer. Assume buffer objects and their condition variables remain allocated while threads wait. List protection and sleep/wakeup atomicity are both necessary.

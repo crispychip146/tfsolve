@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "As printed no value of x makes the state safe: A's maximum claim of 3 units of R5 exceeds the 2 units that exist; D, C, B can finish when x >= 2."
 sources: ["Tanenbaum MOS 4e, sec. 6.5.3 (Banker's algorithm); exercise on safe states"]
+changes:
+  - "2026-10-31: Corrected resource totals while retaining the no-safe-x conclusion."
 ---
 Rows are read as five digits (R1...R5):
 
@@ -17,7 +19,7 @@ Rows are read as five digits (R1...R5):
 | C | 1 1 0 1 0 | 2 1 3 1 0 | 1 0 3 0 0 |
 | D | 1 1 1 1 0 | 1 1 2 2 1 | 0 0 1 1 1 |
 
-Available $=(0,0,x,1,1)$. Total existing: R1 $=4$, R2 $=2$, R3 $=x+4$, R4 $=4$, R5 $=2$.
+Available $=(0,0,x,1,1)$. Total existing: R1 $=5$, R2 $=2$, R3 $=x+4$, R4 $=5$, R5 $=2$.
 
 **Safety test for increasing $x$** (checked with a script):
 

@@ -3,6 +3,8 @@ author: ai
 via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
+changes:
+  - "2026-10-31: Completed the on-disk imap/checkpoint update chain instead of stopping at the in-memory map."
 ---
 Initial layout at address $A0$: a data block $D$ immediately followed by inode block $I$, whose pointer $b[0]$ references $A0$ (i.e. $I$ points at $D$).
 
@@ -12,7 +14,7 @@ In LFS, an in-place update is never performed. Modifying a single byte of the fi
 
 2.  Since $D$ moved, the file's **inode must also change** (its pointer $b[0]$ needs to reference the new location $A1$ instead of the old $A0$): a new inode $I'$ (with $b[0]{:}A1$) is written right after $D'$, at the next free address, say $A2$.
 
-3.  Because $I$ itself moved (from wherever it previously was recorded to now $A2$), the **inode map (imap)** entry for this file's inode number is updated to point at $A2$. Since the imap is looked up directly (not through further indirection), the cascade stops here -- it does not chain any further.
+3.  Because $I$ itself moved (from wherever it previously was recorded to now $A2$), the **inode map (imap)** entry for this file's inode number is updated to point at $A2$. The in-memory imap changes immediately, and the updated **imap piece is also appended to the log** for persistence. The fixed-location checkpoint region periodically records where the newest imap pieces live. This bounded indirection chain avoids recursively rewriting every ancestor directory; it does not mean the imap needs no persistent update.
 
 **Updated layout:**
 
@@ -21,4 +23,4 @@ In LFS, an in-place update is never performed. Modifying a single byte of the fi
 | Old (now dead/garbage, awaiting cleaning) | $A0$: $[\,D \mid I\;(b[0]{:}A0)\,]$ |
 | New (live, appended at the log's tail) | $A1$: $[\,D'\,]$ $A2$: $[\,I'\;(b[0]{:}A1)\,]$ |
 
-and $\text{imap}[\text{inode \#}]$ is updated to $A2$. The old $[D\,|\,I]$ pair at $A0$ is no longer referenced by anything live and becomes garbage, to be reclaimed later by segment cleaning.
+and $\text{imap}[\text{inode \#}]$ is updated to $A2$; append its updated map piece, then publish its location in a later complete checkpoint (with roll-forward handling durable post-checkpoint updates). The old $[D\,|\,I]$ pair at $A0$ is no longer referenced by anything live and becomes garbage, to be reclaimed later by segment cleaning.

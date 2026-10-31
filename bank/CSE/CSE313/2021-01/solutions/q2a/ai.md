@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "RAID 2: bit-level striping with Hamming-code check disks (e.g. 4 data + 3 ECC); corrects single-bit errors but needs many extra disks and synchronised spindles."
 sources: ["Tanenbaum MOS 4e, sec. 5.4.1 (RAID); Patterson, Gibson, Katz 1988"]
+changes:
+  - "2026-10-31: Separated ordinary Hamming SEC from extended SECDED error guarantees."
 ---
 **Architecture.** Data is striped across the disks at the **bit level** (each bit of a word on a different disk) and the disks have their **spindles synchronised**. Extra disks hold a **Hamming error-correcting code** computed over the bits of each word: for 4 data disks, 3 code disks are needed (a 7-bit Hamming codeword).
 
@@ -16,7 +18,7 @@ On a write the controller computes the Hamming bits and writes the data and chec
 
 **Advantages**
 
-- Corrects a **single-bit error** and detects a double error without a separate failure indication from the drive.
+- Corrects a **single-bit error** using Hamming check bits. An additional overall parity bit is needed for **SECDED**: reliable single-error correction and double-error detection. A basic (7,4) Hamming decoder cannot always distinguish a double error from a correctable single error.
 - A failed drive's bit is rebuilt immediately from the code (no loss of availability).
 - **Very high transfer rate** for large sequential reads and writes (all disks work in parallel).
 

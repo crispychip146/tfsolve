@@ -4,9 +4,13 @@ via: chat
 status: unverified
 imported_from: cse313_mem_fs_solved.tex
 changes:
+  - "2026-10-31: Made the external-fragmentation measurement explicit instead of attributing buddy rounding to holes."
+  - "2026-10-31: Added an allocation diagram and separated external fragmentation from power-of-two rounding."
   - "2026-09-30 (import review): layout after the three requests now includes A's 256 KB block."
 ---
 Total memory $=1024$KB, minimum block $=64$KB, so blocks can be sized $1024,512,256,128,64$ KB (a binary buddy tree).
+
+![Buddy memory splits after A, B, C and after freeing A](figures/buddy.png)
 
 **(i) Satisfying the requests.**
 
@@ -26,4 +30,4 @@ New layout: `Free 256KB` $\;|\;$ `128KB (B)` $\;|\;$ `Free 128KB` $\;|\;$ `512KB
 
 - *Internal fragmentation*: B wastes $128-100=28$KB; C wastes $512-300=212$KB. **Total internal fragmentation $=240$KB.**
 
-- *External fragmentation*: total free memory is $256+128=384$KB, but it exists as two separate, non-buddy chunks that cannot be merged into one. So a request for, say, $300$KB could *not* be satisfied even though $384$KB is free in total $\Rightarrow$ external fragmentation is present.
+- *External fragmentation*: total free memory is $256+128=384$KB, but it exists as two separate, non-buddy chunks that cannot be merged into one. The largest allocatable free block is 256 KiB. A request above that cannot succeed; a 300 KiB request rounds up to 512 KiB, so its failure also reflects the power-of-two allocation rule. If external fragmentation is summarized as total free space minus the largest free block, its amount is $384-256=\mathbf{128\text{ KiB}}$. The total free space, 384 KiB, is not itself all wasted: either free block can satisfy a smaller request.

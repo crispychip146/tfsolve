@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "iget returns a locked inode or an error: a cached unlocked inode is locked and returned, a locked one is waited for (sleep and retry), an uncached one is read into a free in-core inode (error if the inode table is full)."
 sources: ["Bach, ch. 4 (algorithm iget)"]
+changes:
+  - "2026-10-31: Made the promised inode lock explicit before returning or reading a reassigned inode."
 ---
 **Algorithm `iget`** allocates (gets) an in-core inode for a given (file system, inode number):
 
@@ -24,11 +26,13 @@ output: locked inode
             if (inode a mount point)  { ... find root inode of mounted fs; continue; }
             if (inode on inode free list) remove it from free list;
             increment inode reference count;
+            mark inode locked;
             return (inode);                         /* locked */
         }
         /* inode not in cache */
         if (no inodes on free list)  return (error);   /* inode table overflow */
         remove new inode from free list;
+        mark new inode locked before any operation that can sleep;
         reset inode number and file system;
         remove inode from old hash queue, put on new one;
         read inode from disk (algorithm bread);

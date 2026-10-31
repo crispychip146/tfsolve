@@ -5,6 +5,7 @@ status: unverified
 summary: "mv does not move data. FFS's large-file rule keeps the first 48 KB with the inode and puts every 4 MB chunk (one indirect block's worth) in a different group, so reading 1 GB takes about 257 x 10 ms + 10.24 s = 12.8 s."
 imported_from: cse313_mem_fs_solved.tex
 changes:
+  - "2026-10-31: Stated binary-unit and initial-positioning assumptions for the FFS read-time estimate."
   - "2026-09-30 (import review): rewritten. The earlier answer assumed the 1 GB file sits in one block group (10.25 s). FFS's large-file exception (OSTEP ch. 41) spreads it over about 257 groups; the question's '4-byte block number, 4 KB block' and 'only moving between groups costs a positioning' point to that."
 ---
 **Layout.** `mv` within one file system only rewrites directory entries: it removes `foo.txt` from `/q`'s directory data and adds `bar.txt`, with the same inode number, to `/p`'s. The file's inode and data blocks stay exactly where FFS put them when `foo.txt` was created, so the layout is decided by how FFS allocates a **large file**:
@@ -21,8 +22,8 @@ changes:
 
 Later, reads just follow the inode's direct and indirect pointers, which `mv` did not change.
 
-**Sequential read time.** Reading the file visits 257 groups: 1 initial positioning plus 256 moves between groups, each costing 10 ms.
+**Sequential read time.** Under the stated large-file placement assumption, reading visits 257 groups: 256 moves between groups, plus an initial positioning if the head is not already in the first group. Take 1 GB=1 GiB and 100 MB/s=100 MiB/s consistently for this calculation.
 
 $$T \approx \underbrace{257\times10\text{ms}}_{2.57\text{ s positioning}} + \underbrace{\frac{1024\text{MB}}{100\text{MB/s}}}_{10.24\text{ s transfer}} \approx \mathbf{12.8\text{ s}}$$
 
-If the file were contiguous in one group it would take $\approx10\text{ms}+10.24\text{s}\approx10.25$ s. The large-file rule costs about 25% more here in exchange for keeping every block group usable; bigger chunks would shrink that overhead.
+If the head already starts in the first group, subtract 10 ms: the estimate becomes 12.80 s instead of 12.81 s. Actual MB/s stated in decimal units would give a different transfer term. If the file were contiguous in one group it would take $\approx10\text{ms}+10.24\text{s}\approx10.25$ s. The large-file rule costs about 25% more here in exchange for keeping every block group usable; bigger chunks would shrink that overhead.

@@ -7,8 +7,10 @@ created: 2026-10-06
 status: unverified
 summary: "A virtual machine monitor (hypervisor) runs on the bare hardware and gives each guest OS a virtual copy of the machine; disadvantages: overhead, difficulty of trapping privileged instructions, memory and I/O sharing costs."
 sources: ["Tanenbaum MOS 4e, sec. 1.7.5 and 7.1 (virtual machines)"]
+changes:
+  - "2026-10-31: Separated classic trap-and-emulate privilege from hardware-assisted guest privilege."
 ---
-**Architecture.** A **virtual machine monitor (VMM, hypervisor)** runs directly on the **real hardware** (type 1) or on a host OS (type 2) and **multiplexes the hardware** among several **virtual machines**. Each VM is an exact copy of the hardware (virtual CPU, memory, disks, network, interrupts) on which an unmodified **guest operating system** with its applications runs, believing it owns the machine. The guest's **privileged instructions** and I/O are **trapped** by the VMM (the guest kernel really runs in user mode and the "virtual kernel mode" is emulated), which performs the operation on the virtual device or maps it to the real device; memory is virtualised with shadow page tables or nested paging.
+**Architecture.** A **virtual machine monitor (VMM, hypervisor)** runs directly on the **real hardware** (type 1) or on a host OS (type 2) and **multiplexes the hardware** among several **virtual machines**. Each VM presents a virtual hardware interface (virtual CPU, memory, disks, network, interrupts) on which an unmodified **guest operating system** with its applications runs, believing it owns the machine. The guest's **privileged instructions** and I/O are **trapped** by the VMM (in classic software virtualization the guest is deprivileged; with hardware assistance it can run at guest kernel privilege in a separate guest/non-root execution mode), which performs the operation on the virtual device or maps it to the real device; memory is virtualised with shadow page tables or nested paging.
 
 ![Virtual machine architecture](figures/vm.png)
 

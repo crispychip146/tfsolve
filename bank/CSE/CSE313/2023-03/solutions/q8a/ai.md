@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "Rename updates the two directories' data and inodes (and the file's ctime) with no data copy; VSFS rewrites those blocks in place, LFS appends new copies of them and the imap to the log."
 sources: ["OSTEP ch. 40 (VSFS)", "OSTEP ch. 43 (LFS: inode map, directories)"]
+changes:
+  - "2026-10-31: Made rename crash consistency depend on recovery protocol rather than append-only writes alone."
 ---
 `mv ~/a/foo.txt ~/b/bar.txt` is a **rename** within one file system: the file's *data is never copied*; only directory entries change. The file keeps its inode number (say 7).
 
@@ -31,4 +33,4 @@ The operation touches several blocks that must all be written; a crash in betwee
 - new inode 7 ($I_7'$) with the updated ctime;
 - the **inode map** piece(s) pointing to the new inode addresses. (Thanks to the inode map, directories need not be changed just because an inode moved; this avoids the recursive-update problem.)
 
-The old copies become garbage, reclaimed later by the cleaner. The checkpoint region is updated periodically to point to the latest imap pieces. One sequential write replaces many scattered ones; consistency after a crash comes from the checkpoint plus roll-forward.
+The old copies become garbage, reclaimed later by the cleaner. The checkpoint region is updated periodically to point to the latest imap pieces. One sequential write replaces many scattered ones; consistency after a crash requires checkpoint/roll-forward recovery to reconcile the related source-directory, destination-directory and inode updates. Writing sequentially by itself does not make a multi-block rename atomic, particularly if it spans segments.

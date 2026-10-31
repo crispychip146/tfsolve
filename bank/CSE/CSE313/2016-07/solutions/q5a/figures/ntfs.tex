@@ -1,25 +1,33 @@
 \documentclass[border=6pt]{standalone}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds,patterns,matrix,decorations.pathreplacing}
+\usetikzlibrary{arrows.meta}
 \begin{document}
-\begin{tikzpicture}[>=Stealth,font=\small]
-\tikzstyle{m}=[draw,minimum width=3.4cm,minimum height=0.6cm,font=\scriptsize,fill=blue!10,align=center]
-\tikzstyle{d}=[draw,minimum width=0.9cm,minimum height=0.6cm,font=\scriptsize,fill=green!15]
-\node[font=\scriptsize\bfseries] at (0,2.4) {(a) small file};
-\node[m] at (0,1.7) {MFT record}; \node[m,fill=green!20] at (0,1.1) {data (resident)};
-\node[font=\scriptsize,align=center] at (0,0.3) {all data inside\\ the MFT record};
-\node[font=\scriptsize\bfseries] at (4.6,2.4) {(b) data in extents};
-\node[m] (m2) at (4.6,1.7) {MFT record}; \node[m] (e2) at (4.6,1.1) {extent pointers};
-\node[d] (d21) at (3.6,-0.1) {run}; \node[d] (d22) at (4.6,-0.1) {run}; \node[d] (d23) at (5.6,-0.1) {run};
-\draw[->] (e2.south) -- (d21.north); \draw[->] (e2.south) -- (d22.north); \draw[->] (e2.south) -- (d23.north);
-\node[font=\scriptsize\bfseries] at (9.2,2.4) {(c) many extents};
-\node[m] (m3) at (9.2,1.7) {MFT record}; \node[m,fill=orange!20] (e3) at (9.2,1.1) {pointer to extent list};
-\node[m,fill=orange!20,minimum width=2cm] (x3) at (9.2,-0.1) {extent list}; \node[d] (d31) at (8.4,-1.1) {run}; \node[d] (d32) at (10.0,-1.1) {run};
-\draw[->] (e3.south) -- (x3.north); \draw[->] (x3.south) -- (d31.north); \draw[->] (x3.south) -- (d32.north);
-\node[font=\scriptsize\bfseries] at (13.8,2.4) {(d) very large};
-\node[m] (m4) at (13.8,1.7) {MFT record}; \node[m,fill=orange!35] (e4) at (13.8,1.1) {other MFT records};
-\node[m,minimum width=1.4cm] (r1) at (12.9,-0.1) {MFT rec}; \node[m,minimum width=1.4cm] (r2) at (14.7,-0.1) {MFT rec};
-\draw[->] (e4.south) -- (r1.north); \draw[->] (e4.south) -- (r2.north);
-\node[d] (d41) at (12.9,-1.1) {runs}; \node[d] (d42) at (14.7,-1.1) {runs}; \draw[->] (r1.south) -- (d41.north); \draw[->] (r2.south) -- (d42.north);
+\begin{tikzpicture}[>=Stealth]
+\node[align=center,font=\small] at (7.188,6.025) {Four NTFS attribute-storage cases (schematic)};
+\node[align=center,font=\small] at (1.750,5.125) {(a) Resident data};
+\node[align=center,font=\small] at (1.750,3.812) {(b) Nonresident data};
+\node[align=center,font=\small] at (1.750,2.500) {(c) Extension records};
+\node[align=center,font=\small] at (1.750,1.188) {(d) Nonresident list};
+\draw[fill=green!10] (3.875,5.562) rectangle (7.625,4.688);
+\node[align=center,font=\small] at (5.750,5.125) {Base MFT record\\resident DATA};
+\draw[fill=blue!10] (3.875,4.250) rectangle (7.625,3.375);
+\node[align=center,font=\small] at (5.750,3.812) {Base MFT record\\DATA runlist};
+\draw[fill=green!10] (10.250,4.250) rectangle (13.500,3.375);
+\node[align=center,font=\small] at (11.875,3.812) {External data runs};
+\draw[->] (7.625,3.812) -- (10.250,3.812);
+\draw[fill=blue!10] (3.875,2.938) rectangle (7.625,2.062);
+\node[align=center,font=\small] at (5.750,2.500) {Base record\\ATTRIBUTE LIST};
+\draw[fill=violet!12] (8.375,2.938) rectangle (13.500,2.062);
+\node[align=center,font=\small] at (10.938,2.500) {Extension MFT records\\DATA runlist pieces};
+\draw[->] (7.625,2.500) -- (8.375,2.500);
+\draw[fill=blue!10] (3.875,1.625) rectangle (7.625,0.750);
+\node[align=center,font=\small] at (5.750,1.188) {Base record\\list runlist};
+\draw[fill=violet!12] (8.375,1.625) rectangle (10.750,0.750);
+\node[align=center,font=\small] at (9.562,1.188) {External\\attribute list};
+\draw[fill=blue!10] (11.500,1.625) rectangle (13.875,0.750);
+\node[align=center,font=\small] at (12.688,1.188) {Extension\\MFT records};
+\draw[->] (7.625,1.188) -- (8.375,1.188);
+\draw[->] (10.750,1.188) -- (11.500,1.188);
+\node[align=center,font=\small] at (7.188,0.312) {Runlists in base/extension records locate the external file data.};
 \end{tikzpicture}
 \end{document}

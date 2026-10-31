@@ -5,44 +5,27 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "Each philosopher needs just one of his two forks: protect each fork with a lock/condition and let him take whichever is free; all 5 can eat at once, and no deadlock arises because nobody holds a fork while waiting for another."
+summary: "One semaphore per fork; philosopher i always takes fork i, so all five can eat independently."
 sources: ["Tanenbaum MOS 4e, sec. 2.5.1 (dining philosophers), 2.3.7 (monitors)"]
+changes:
+  - "2026-10-31: Used the one-fork requirement to achieve the full five-philosopher parallelism directly."
 ---
-**Assumptions.** In this modified problem a philosopher can eat as soon as **one** of his two adjacent forks is available. There are 5 forks, so **at most 5 philosophers can eat simultaneously** (each with a different fork): the target is maximum parallelism.
-
-**Solution (monitor/mutex with condition variables).** `free[f]` records whether fork $f$ is free; philosopher $i$ has the forks $i$ (left) and $(i+1)\bmod5$ (right).
+The classical problem needs **two** forks per philosopher; this variation needs only **one**. Number philosophers $0\ldots4$ and let fork $i$ be the fork on philosopher $i$'s left. Each fork is physically shared by two neighbours, but we may choose a protocol in which every philosopher consistently chooses the left one.
 
 ```c
 #define N 5
-int   free_fork[N] = {1,1,1,1,1};
-mutex_t m;                       /* protects free_fork[] only for short periods */
-cond_t  can_eat[N];              /* one condition per philosopher */
+semaphore fork[N] = {1, 1, 1, 1, 1};
 
 void philosopher(int i) {
-    int f;
     while (TRUE) {
         think();
-        lock(&m);
-        while (!free_fork[i] && !free_fork[(i+1) % N])   /* both neighbours' forks in use */
-            wait(&can_eat[i], &m);
-        f = free_fork[i] ? i : (i+1) % N;                /* take whichever is free */
-        free_fork[f] = 0;
-        unlock(&m);
-
-        eat();                                           /* outside the lock: parallel */
-
-        lock(&m);
-        free_fork[f] = 1;                                /* put the fork down */
-        signal(&can_eat[f]);                             /* the philosopher on one side */
-        signal(&can_eat[(f + N - 1) % N]);               /* ... and on the other side */
-        unlock(&m);
+        down(&fork[i]);
+        eat();
+        up(&fork[i]);
     }
 }
 ```
 
-**Properties.**
+**Why this achieves maximum parallelism.** The assignment $i\mapsto\text{fork }i$ is one-to-one: no other philosopher requests that fork under this protocol. Thus if all five are hungry, all five obtain distinct forks and eat together. Five is also an upper bound, because there are only five philosophers and five forks, so the protocol reaches the maximum.
 
-- **Mutual exclusion on each fork** (`free_fork[f]`).
-- **Maximum parallelism:** `eat()` is outside the critical section, and each philosopher takes only one fork, so all 5 can eat together.
-- **No deadlock:** a philosopher never holds one fork while waiting for another (no hold-and-wait).
-- **Starvation** is possible in principle (the neighbours may keep both forks busy alternately); it can be removed by giving priority to the philosopher who has waited longest (e.g. a FIFO queue of hungry philosophers).
+**Safety and progress.** No fork is used by two philosophers; no philosopher holds one resource while requesting another, so no deadlock forms. With eventual CPU scheduling and finite `eat()` calls, every hungry philosopher progresses. This solution relies on the stated permission to eat with either one fork; it would fail immediately for the classical two-fork problem. Reserving one side by protocol also avoids a greedy arbitrary-choice allocation leaving an unused fork that a blocked philosopher cannot reach.

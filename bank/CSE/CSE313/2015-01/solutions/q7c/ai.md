@@ -5,24 +5,20 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "Compute-bound processes have long CPU bursts and rare I/O; I/O-bound processes have short CPU bursts between long waits (figure)."
+summary: "Blocking waits for progress; nonblocking returns immediately with available progress or EAGAIN/EWOULDBLOCK."
 sources: ["Tanenbaum MOS 4e, sec. 2.4.1 (fig. 2-39: bursts of CPU usage alternate with periods of waiting for I/O)"]
+changes:
+  - "2026-10-31: Replaced unrelated CPU/I/O-bound notes with blocking versus nonblocking syscall semantics."
 ---
-Processes alternate between **CPU bursts** (computing) and **I/O waits**:
+A system call may need an event that has not happened yet: for example, `read()` on an empty pipe needs a writer to supply bytes. The distinction is what the OS does while that event is unavailable.
 
-```text
-(a) compute-bound (CPU-bound) process:   long CPU bursts, rare short I/O waits
-    |##########|.|##########|.|##########|.|##########|
-(b) I/O-bound process:                   short CPU bursts, long waits for I/O
-    |#|........|#|........|#|........|#|........|#|
-    # = using the CPU    . = waiting for I/O
-```
-
-| | **Compute-bound** | **I/O-bound** |
+| Situation | Blocking call | Nonblocking call |
 |:--|:--|:--|
-| Time spent | mostly **computing** | mostly **waiting for I/O** |
-| CPU bursts | **long** | **short** (just enough to issue the next request) |
-| Examples | scientific computation, compilers, video encoding | database queries, file copy, interactive programs |
-| Scheduling | needs long uninterrupted CPU time; low priority is fine | should get the CPU **promptly** when it becomes ready, to keep the I/O devices busy |
+| Requested progress is possible now | Return the available result | Return the available result |
+| No progress is possible now | Suspend the calling thread until progress, an error or interruption | Return immediately, commonly with EAGAIN/EWOULDBLOCK |
+| CPU while waiting | Available to another runnable task | Caller must decide what else to do |
+| Typical use | Simple sequential code | Event loops serving many connections |
 
-The trend is that CPUs get faster than disks, so processes become more and more I/O-bound; scheduling should favour the I/O-bound ones.
+For example, a blocking pipe read sleeps if the pipe is empty while a writer still exists. With `O_NONBLOCK`, the same read returns `-1` with `errno` set to `EAGAIN` or `EWOULDBLOCK`. If all writers have closed the pipe, an empty read returns **0 for end-of-file**, rather than waiting or reporting temporary unavailability.
+
+Both kinds can return **partial transfers**: blocking does not promise to fill an arbitrary buffer. Nonblocking also differs from asynchronous I/O: it reports the result of the present attempt, while asynchronous I/O submits work whose completion is reported later. Repeatedly retrying a nonblocking call in a tight loop wastes CPU; use readiness notification such as `poll()` before retrying when appropriate.

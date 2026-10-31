@@ -7,6 +7,8 @@ created: 2026-10-06
 status: unverified
 summary: "SRTN needs the remaining time in advance (only an estimate), starves long jobs, and needs bookkeeping and extra context switches."
 sources: ["Tanenbaum MOS 4e, sec. 2.4.2 (shortest remaining time next)"]
+changes:
+  - "2026-10-31: Clarified SRTN optimality without requiring knowledge of future arrivals."
 ---
 **Shortest Remaining Time Next (SRTN)** is the preemptive version of SJF: the process with the least remaining run time always gets the CPU, and a new process with a shorter remaining time preempts the running one. Its limitations:
 
@@ -14,4 +16,4 @@ sources: ["Tanenbaum MOS 4e, sec. 2.4.2 (shortest remaining time next)"]
 2. **Starvation:** long jobs may be postponed indefinitely if a stream of short jobs keeps arriving.
 3. **Overhead:** it must keep track of the remaining time of every process and compare on every arrival; frequent **preemptions** mean many **context switches**.
 4. It is **unfair** (long jobs suffer) and does not take priorities or deadlines into account.
-5. It is only optimal for mean turnaround when all job information is available.
+5. On one CPU with independent jobs, known remaining processing times and zero preemption cost, SRTN minimizes mean turnaround even with different arrival times; it does not need to know future arrivals. That guarantee does not automatically extend to weighted jobs, deadlines, I/O dependencies or costly switching.

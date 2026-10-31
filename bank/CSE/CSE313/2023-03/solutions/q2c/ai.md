@@ -7,7 +7,11 @@ created: 2026-10-06
 status: unverified
 summary: "3 processes in total (2 new); outputs: 3 2 2 4, 2 3 2 4, 2 2 3 4, 2 2 4 3."
 sources: ["OSTEP ch. 5 (fork/wait)", "Tanenbaum MOS 4e, sec. 2.1"]
+changes:
+  - "2026-10-31: Stated intended waitpid and unbuffered-output assumptions without altering the question."
 ---
+**Interpretation.** Treat the printed `int main{` as `int main(void) {`, and the three-argument `wait(pid2, NULL, 0)` as the intended `waitpid(pid2, NULL, 0)`; the printed version is not valid POSIX C. Assume each `printf` produces its complete output immediately, for example after `setbuf(stdout, NULL)`. Without that assumption, stdio buffering can change the visible output order.
+
 Name the processes: $P$ (original), $C$ (child of the first `fork`) and $G$ (child of the second `fork`, made by $C$).
 
 **Trace.**

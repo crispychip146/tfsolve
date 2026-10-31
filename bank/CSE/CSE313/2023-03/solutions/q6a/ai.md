@@ -5,38 +5,55 @@ model: claude-sonnet-5-5
 prompt: solve-v1
 created: 2026-10-06
 status: unverified
-summary: "Per-track seek = 100/32767 ms; SSTF 18 tracks = 0.055 ms; SCAN to the end 98,301 tracks = 300 ms; C-SCAN 196,602 tracks = 600 ms (LOOK variants: 18 and 29 tracks)."
+summary: "With immediate batch arrival and linear seek: SSTF 0.055 ms, SCAN 200.024 ms, C-SCAN 400.009 ms; LOOK/C-LOOK differ."
 sources: ["OSTEP ch. 37 (hard disks, disk scheduling)", "Tanenbaum MOS 4e, sec. 5.4.3"]
+changes:
+  - "2026-10-31: Stopped seek accounting at the final serviced request of each batch and stated timing assumptions."
 ---
-**Geometry.** $1\text{ GB}/4\text{ KB} = 262{,}144$ blocks; with 8 blocks per track there are $262{,}144/8 = 32{,}768$ tracks (0 to 32767). Block $b$ is on track $\lfloor b/8\rfloor$. The maximum seek (track 0 to track 32767, i.e. 32,767 tracks) is 100 ms, so we assume the seek time is proportional to the number of tracks crossed:
+First translate block numbers into **tracks**, because seeking moves the head between tracks. Use binary units: $1\text{ GiB}/4\text{ KiB}=262144$ blocks. At 8 blocks per track, there are 32768 tracks, numbered 0 through 32767.
 
-$$t_{\text{track}} = \frac{100}{32767}\text{ ms}\approx 0.00305\text{ ms}$$
+**Timing assumption.** A maximum seek time alone does not determine arbitrary seek times. For a numerical answer, assume seek time is linear in track distance:
 
-Batches in tracks (head starts at track 0, SCAN direction initially *upward*; the arm position carries over from one batch to the next):
+$$t_{\text{track}}=\frac{100}{32767}\text{ ms}.$$
 
-| Batch | Blocks | Tracks |
-|:-:|:--|:--|
-| 1 | 1, 40, 2, 15 | 0, 5, 0, 1 |
-| 2 | 10, 1, 13, 32, 2, 7 | 1, 0, 1, 4, 0, 0 |
-| 3 | 70, 49, 0, 6, 28 | 8, 6, 0, 0, 3 |
+Assume SCAN and C-SCAN start upward, and a new batch arrives **immediately when the previous batch's last request is served**. Keep the current head position and direction between batches. Stop counting after the final request of batch 3; movement after that is not needed to handle these requests.
 
-**i. SSTF** (always the nearest request):
+| Batch | Requested tracks, with duplicates retained |
+|:-:|:--|
+| 1 | 0, 5, 0, 1 |
+| 2 | 1, 0, 1, 4, 0, 0 |
+| 3 | 8, 6, 0, 0, 3 |
 
-- batch 1: $0\to0\to1\to5$: 5 tracks (head at 5)
-- batch 2: $5\to4\to1\to0$: 5 tracks (head at 0)
-- batch 3: $0\to3\to6\to8$: 8 tracks (head at 8)
+Multiple requests on the same track add no seek distance.
 
-Total $=18$ tracks $\Rightarrow 18\times0.00305 \approx \mathbf{0.055\ ms}$.
+**(i) SSTF.** Always choose a pending track nearest to the current head:
 
-**ii. SCAN** (the arm sweeps all the way to the end of the disk before it reverses): batch 1: from track 0 up to track 32767 (32,767 tracks); batch 2: the arm is at the top and moves down to track 0 (32,767); batch 3: up to track 32767 again (32,767). Total $=98{,}301$ tracks $\Rightarrow\mathbf{300\ ms}$.
+| Batch | Head route | Distance |
+|:-:|:--|:-:|
+| 1 | 0, 1, 5 | 5 |
+| 2 | 5, 4, 1, 0 | 5 |
+| 3 | 0, 3, 6, 8 | 8 |
 
-**iii. C-SCAN** (sweep up to the end, then jump back to track 0 without servicing): each batch costs $32{,}767$ (up) $+\,32{,}767$ (return) tracks. Three batches: $6\times32{,}767=196{,}602$ tracks $\Rightarrow\mathbf{600\ ms}$ (300 ms if the return jump is not counted as seeking).
+Total distance is 18 tracks, so **SSTF takes about 0.05493 ms** under the linear model.
 
-**If the arm turns around at the last request instead of at the disk end** (LOOK / C-LOOK, the "elevator" of Tanenbaum):
+**(ii) SCAN.** Reverse only at a physical end, rather than at the last pending request. Batch 1 finishes at track 5 while moving up. Batch 2 then arrives entirely behind the head, so it must first continue to the upper end and reverse.
 
-| Algorithm | Batch 1 | Batch 2 | Batch 3 | Total tracks | Time |
-|:--|:-:|:-:|:-:|:-:|:-:|
-| LOOK | 5 | 5 | 8 | 18 | 0.055 ms |
-| C-LOOK | 5 | 9 | 15 | 29 | 0.089 ms |
+| Batch | Head route | Distance |
+|:-:|:--|:-:|
+| 1 | 0, 1, 5 | 5 |
+| 2 | 5, 32767, 4, 1, 0 | 65529 |
+| 3 | serve track 0, reverse upward, then 3, 6, 8 | 8 |
 
-*Note.* The paper does not say whether the arm goes to the end of the disk, so both readings are given; the SSTF value is unaffected. (The values were computed with a short script.)
+$$T_{SCAN}=65542\frac{100}{32767}\text{ ms}\approx\mathbf{200.024\text{ ms}}.$$
+
+**(iii) C-SCAN.** Serve while moving upward; return from the upper end to track 0 without serving during the return. Count the return as physical seeking.
+
+| Batch | Head route | Distance |
+|:-:|:--|:-:|
+| 1 | 0, 1, 5 | 5 |
+| 2 | 5, 32767, 0, 1, 4 | 65533 |
+| 3 | 4, 6, 8, 32767, 0, 3 | 65533 |
+
+$$T_{C\text{-}SCAN}=131071\frac{100}{32767}\text{ ms}\approx\mathbf{400.009\text{ ms}}.$$
+
+**Other conventions.** If "elevator" means **LOOK**, which reverses at the last pending request, the total is 18 tracks, about 0.05493 ms. C-LOOK totals 29 tracks, about 0.08850 ms. If an exercise explicitly charges a *whole endpoint sweep after every batch*, including unnecessary motion after its last request, it instead gives 300 ms for SCAN or 600 ms for C-SCAN. That is a different completion/accounting convention. The paper does not state such an extra sweep.
