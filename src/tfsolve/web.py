@@ -190,6 +190,9 @@ def _help():
   of the questions on screen, with counts. Tap one to go to its first question, on whichever page it is; your
   filters are not changed. Click a topic chip on a question to see just that topic, or a chip under the heading to
   remove that one choice.</li>
+  <li><b>Save for revision</b> on a question bookmarks it; tick <i>Only saved for revision</i> in Filters to find
+  it later. <b>Mark as done</b> minimizes the question; press <b>Done · Undo</b> to expand it again.
+  Both choices are saved in this browser only and are lost if you clear this site's browser data.</li>
   <li><b>Print / Save PDF</b> prints <i>every</i> question matching the filters (not just the page on screen),
   contents included, with all solutions opened. Tick <i>Questions only when printing</i> to leave the solutions out.
   It may take a few seconds to gather them all.</li>
@@ -366,11 +369,18 @@ def _course(bank, course, repo_root, out_dir):
         card = f"""<article class="q" id="{esc(qid)}">
   <div class="qhead"><span class="qexam">{esc(exam.title)}</span><span class="qlabel">{esc(part.label)}</span>
     <span class="facts">{' · '.join(esc(f) for f in facts if f)}</span></div>
+  <div class="qactions">
+    <button type="button" class="ghost" data-question-action="revision" aria-pressed="false">Save for revision</button>
+    <button type="button" class="ghost" data-question-action="done" aria-pressed="false"
+      aria-expanded="true" aria-controls="{esc(qid)}-content">Mark as done</button>
+  </div>
+  <div class="qcontent" id="{esc(qid)}-content">
   <div class="chips">{chips}</div>
   {setup}<div class="body">{body_html}</div>{note}
   {''.join(sol_html)}
   <div class="links"><a href="{_github(part.path, repo_root)}">Edit question</a>
     <a href="{add}">Add a solution</a></div>
+  </div>
 </article>"""
         (out_dir / "q" / f"{qid}.html").write_text(card, encoding="utf-8")
         digest.update(card.encode("utf-8"))
@@ -447,6 +457,7 @@ def _course(bank, course, repo_root, out_dir):
   {multi("f-topic", "Topics", "All topics", "topic", topic_opts, find="Find a topic")}
   <label>Search<input type="search" id="f-text" placeholder="e.g. deadlock, Gantt"></label>
   <label class="check"><input type="checkbox" id="f-solved"> Only questions with solutions</label>
+  <label class="check"><input type="checkbox" id="f-revision"> Only saved for revision</label>
   <label class="check"><input type="checkbox" id="f-open"> Show all solutions</label>
   <label class="check"><input type="checkbox" id="f-qonly"> Questions only when printing</label>
   <div class="showbar"><button type="button" id="f-show" class="primary">Show questions</button></div>
@@ -469,6 +480,8 @@ def _course(bank, course, repo_root, out_dir):
   <div class="results-head">
     <h2 id="results-title" tabindex="-1">Results</h2>
     <p class="muted" id="results-sub"></p>
+    <p class="muted">Revision and done marks are saved in this browser only.</p>
+    <p class="muted" id="storage-note" role="status" hidden></p>
     <div class="active" id="results-chips"></div>
     <p class="stale" id="results-stale" role="status" hidden>Your filters changed.
       <button type="button" id="results-update">Update results</button></p>

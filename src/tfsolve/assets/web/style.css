@@ -115,6 +115,11 @@ button.ghost:hover { background: var(--blue-soft); color: var(--blue); }
 .qhead { display: flex; flex-wrap: wrap; gap: 0.25rem 0.75rem; align-items: baseline; }
 .qlabel { font-weight: 700; color: var(--title); font-size: 1.1rem; }
 .facts { color: var(--muted); font-size: 0.9rem; }
+.qactions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.qactions button { font-size: 0.8rem; padding: 0.3rem 0.6rem; }
+.qactions button[aria-pressed="true"] { color: var(--ok); border-color: var(--ok); }
+.q.done { border-left-color: var(--ok); }
+.q.done > .qcontent { display: none; }
 .chips { margin: 0.4rem 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .chip {
   background: var(--blue-soft); color: var(--title); border: 1px solid var(--line); border-radius: 999px;
@@ -334,7 +339,8 @@ picture { display: block; }
     --tok-fn: #6639ba; --tok-pp: #953800; --tok-op: #24292f; --tok-err: #cf222e;
   }
   body { background: #fff; }
-  .top, .crumbs, .filters, .filters-toggle, footer, .links, .chip, .overview, .pager, .active, .stale, noscript { display: none !important; }
+  .top, .crumbs, .filters, .filters-toggle, footer, .links, .chip, .overview, .pager, .active, .stale, .qactions, #storage-note, noscript { display: none !important; }
+  .q.done > .qcontent { display: block; }
   .filters::backdrop { display: none; }
   body.filters-open { overflow: visible; }
   .contents { border: 0; padding: 0; break-after: page; }

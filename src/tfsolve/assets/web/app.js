@@ -89,6 +89,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var exam = picker("f-exam");
   var pickers = [topic, faculty, exam];
   var solved = $("f-solved");
+  var revision = $("f-revision");
   var openAll = $("f-open");
   var qonly = $("f-qonly");
   var showBtn = $("f-show");
@@ -99,6 +100,45 @@ document.addEventListener("DOMContentLoaded", function () {
   var printArea = $("print-area");
   var arrangeButtons = document.querySelectorAll("[data-arrange]");
   var arrangement = "topic";
+
+  // Personal marks stay on this browser, separately for each course.
+  var storageKey = "tfsolve:questions:" + COURSE.code;
+  var marks = {};
+  try {
+    var saved = JSON.parse(localStorage.getItem(storageKey));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) marks = saved;
+  } catch (e) {}
+  function marked(id, field) { return !!marks[id] && marks[id][field] === true; }
+  function syncCard(card) {
+    var done = marked(card.id, "done");
+    var saved = marked(card.id, "revision");
+    card.classList.toggle("done", done);
+    var revBtn = card.querySelector('[data-question-action="revision"]');
+    var doneBtn = card.querySelector('[data-question-action="done"]');
+    revBtn.textContent = saved ? "Saved for revision" : "Save for revision";
+    revBtn.setAttribute("aria-pressed", String(saved));
+    doneBtn.textContent = done ? "Done · Undo" : "Mark as done";
+    doneBtn.setAttribute("aria-pressed", String(done));
+    doneBtn.setAttribute("aria-expanded", String(!done));
+  }
+  function toggleMark(card, field) {
+    var state = { revision: marked(card.id, "revision"), done: marked(card.id, "done") };
+    state[field] = !state[field];
+    if (state.revision || state.done) marks[card.id] = state; else delete marks[card.id];
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(marks));
+    } catch (e) {
+      $("storage-note").hidden = false;
+      $("storage-note").textContent = "Browser storage is unavailable. These marks will last until you reload this page.";
+    }
+    syncCard(card);
+    if (field === "revision") {
+      if (committed && committed.c.revision) {
+        current = arranged(committed.c, committed.arr);
+        show(page, { keep: true, noScroll: true, replace: true });
+      } else refresh();
+    }
+  }
 
   // The index: topics (in course order), exams (newest first) and one record per question.
   var info = {}, topicPos = {}, roots = [], kids = {}, examInfo = {};
@@ -169,7 +209,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // ---- filters
   function criteria() {
     return {
-      topic: topic.get(), faculty: faculty.get(), exam: exam.get(), solved: solved.checked,
+      topic: topic.get(), faculty: faculty.get(), exam: exam.get(), solved: solved.checked, revision: revision.checked,
       raw: text.value.trim(), text: text.value.replace(NOISE, " ").toLowerCase().split(/\s+/).join(" ").trim()
     };
   }
@@ -182,7 +222,8 @@ document.addEventListener("DOMContentLoaded", function () {
   function inFaculty(q) { return function (w) { return q.who[w]; }; }
   function inExam(q) { return function (e) { return q.exam === e; }; }
   function others(q, c) { // the filters that are not teacher / exam / topic
-    return (!c.solved || q.solved) && (!c.text || !searchText || searchText[q.i].indexOf(c.text) !== -1);
+    return (!c.solved || q.solved) && (!c.revision || marked(q.id, "revision")) &&
+      (!c.text || !searchText || searchText[q.i].indexOf(c.text) !== -1);
   }
   function matches(q, c) {
     return hit(c.topic, inTopic(q)) && hit(c.exam, inExam(q)) && hit(c.faculty, inFaculty(q)) && others(q, c);
@@ -226,6 +267,7 @@ document.addEventListener("DOMContentLoaded", function () {
       c[f].forEach(function (v) { out.push({ field: f, value: v, label: LABEL[f] + ": " + nameOf(f, v) }); });
     });
     if (c.solved) out.push({ field: "solved", label: "With solutions" });
+    if (c.revision) out.push({ field: "revision", label: "Saved for revision" });
     if (c.raw) out.push({ field: "text", label: "Search: \u201c" + c.raw + "\u201d" });
     return out;
   }
@@ -239,10 +281,11 @@ document.addEventListener("DOMContentLoaded", function () {
         (v.length <= 3 && names.join(", ").length <= 60 ? names.join(", ") : v.length + " chosen"));
     });
     if (c.solved) bits.push("with solutions");
+    if (c.revision) bits.push("saved for revision");
     if (c.raw) bits.push("\u201c" + c.raw + "\u201d");
     return "Results for " + COURSE.code + ": " + (bits.length ? bits.join(" \u00b7 ") : "all questions");
   }
-  function key(c, arr) { return JSON.stringify([arr || arrangement, c.topic, c.exam, c.faculty, c.solved, c.text]); }
+  function key(c, arr) { return JSON.stringify([arr || arrangement, c.topic, c.exam, c.faculty, c.solved, c.revision, c.text]); }
   function plural(n) { return n + " question" + (n === 1 ? "" : "s"); }
 
   // ---- the map: topics (or exams) of the questions the filters match; tapping one jumps to its first question
@@ -375,6 +418,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function afterInsert(root) {
+    root.querySelectorAll(".q[id]").forEach(syncCard);
     if (openAll.checked) root.querySelectorAll(".solution").forEach(function (d) { d.open = true; });
     root.querySelectorAll(".body a[href^='http'], .stem a[href^='http']").forEach(function (a) { // outside material
       a.target = "_blank";
@@ -398,6 +442,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (c.exam.length) p.set("exam", c.exam.join(","));
     if (c.topic.length) p.set("topic", c.topic.join(","));
     if (c.solved) p.set("solved", "1");
+    if (c.revision) p.set("revision", "1");
     if (c.raw) p.set("q", c.raw);
     if (allMode) p.set("p", "all"); else if (page > 1) p.set("p", String(page));
     try { history[push ? "pushState" : "replaceState"](null, "", "#" + p.toString()); } catch (e) {}
@@ -532,9 +577,10 @@ document.addEventListener("DOMContentLoaded", function () {
     exam.set(list("exam"));
     topic.set(list("topic"));
     solved.checked = p.get("solved") === "1";
+    revision.checked = p.get("revision") === "1";
     text.value = p.get("q") || "";
     var any = p.get("show") === "1" || faculty.get().length || exam.get().length || topic.get().length ||
-      solved.checked || text.value;
+      solved.checked || revision.checked || text.value;
     return { show: !!any, page: parseInt(p.get("p"), 10) || 1, all: p.get("p") === "all" };
   }
   window.addEventListener("popstate", function () {
@@ -569,6 +615,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
   solved.addEventListener("change", refresh);
+  revision.addEventListener("change", refresh);
   var typing = null;
   text.addEventListener("input", function () {
     clearTimeout(typing);
@@ -589,6 +636,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) return;
     var f = b.dataset.field;
     if (f === "solved") solved.checked = false;
+    else if (f === "revision") revision.checked = false;
     else if (f === "text") text.value = "";
     else ({ topic: topic, exam: exam, faculty: faculty })[f].toggle(b.dataset.value);
     show(1);
@@ -608,6 +656,8 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
   list.addEventListener("click", function (e) {
+    var action = e.target.closest("[data-question-action]");
+    if (action) { toggleMark(action.closest(".q"), action.dataset.questionAction); return; }
     var chip = e.target.closest(".chip"); // a topic chip on a question: show that topic
     if (chip) { topic.set([chip.dataset.topic]); show(1); return; }
     if (e.target.closest("[data-retry]")) show(page, { noScroll: true, replace: true, keep: true });
@@ -617,6 +667,7 @@ document.addEventListener("DOMContentLoaded", function () {
     pickers.forEach(function (pk) { pk.set([]); });
     text.value = "";
     solved.checked = false;
+    revision.checked = false;
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
     hideResults();
   });
